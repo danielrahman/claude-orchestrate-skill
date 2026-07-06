@@ -1,0 +1,19 @@
+{
+  "name": "claude-orchestrate-skill",
+  "description": "A strict Claude leader and worker-lane orchestration skill. Claude plans and reviews, workers implement, verifier checks, integration waits for user approval.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Daniel Rahman"
+  },
+  "homepage": "https://github.com/danielrahman/claude-orchestrate-skill",
+  "repository": "https://github.com/danielrahman/claude-orchestrate-skill",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "orchestration",
+    "multi-agent",
+    "worktree",
+    "verification"
+  ]
+}

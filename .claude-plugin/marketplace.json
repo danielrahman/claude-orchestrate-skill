@@ -1,0 +1,14 @@
+{
+  "name": "claude-orchestrate-skill",
+  "description": "Claude leads, workers build, a separate verifier checks. A strict worktree-based orchestration skill for delegated implementation.",
+  "owner": {
+    "name": "Daniel Rahman"
+  },
+  "plugins": [
+    {
+      "name": "claude-orchestrate-skill",
+      "source": "./",
+      "description": "Claude leads, workers build, a separate verifier checks. A strict worktree-based orchestration skill for delegated implementation."
+    }
+  ]
+}
