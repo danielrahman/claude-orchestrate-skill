@@ -18,7 +18,13 @@ The repository name is retained for compatibility with existing Claude Code
 plugin installs. The Codex skill is distributed as a standalone file in the
 same repository.
 
-![Claude-led orchestrate skill flow](docs/orchestrate-twitter-card.png)
+## Claude-led flow
+
+![Claude-led orchestrator: Claude plans, Codex and Fable workers build, and an independent verifier checks](docs/claude-orchestrator-readme.webp)
+
+## Codex-led flow
+
+![Codex-led orchestrator: one Codex leader dispatches native workers and an independent verifier](docs/codex-orchestrator-readme.webp)
 
 ## Install
 
@@ -132,7 +138,8 @@ shaping, or work that must remain in the current dirty checkout.
 skills/orchestrate/SKILL.md        Claude-led skill and plugin command
 .codex/skills/orchestrate/SKILL.md Codex-led skill
 .claude-plugin/                    Claude Code plugin metadata
-docs/orchestrate-twitter-card.png  Claude-led social preview
+docs/*-orchestrator-readme.webp     README flow cards
+docs/orchestrate-twitter-card.png  Original Claude-led social preview
 AGENTS.md                          contributor instructions
 CLAUDE.md                          imports AGENTS.md
 ```

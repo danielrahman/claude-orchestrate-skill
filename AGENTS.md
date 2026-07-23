@@ -8,7 +8,8 @@ Codex. There is no build step. Keep changes text-focused and easy to audit.
 - `skills/orchestrate/SKILL.md` - Claude-led skill and Claude Code plugin body
 - `.codex/skills/orchestrate/SKILL.md` - native Codex-led skill
 - `.claude-plugin/` - Claude Code plugin and marketplace metadata
-- `docs/orchestrate-twitter-card.png` - Claude-led social preview
+- `docs/*-orchestrator-readme.webp` - generated README flow cards
+- `docs/orchestrate-twitter-card.png` - original Claude-led social preview
 
 ## Working agreements
 
