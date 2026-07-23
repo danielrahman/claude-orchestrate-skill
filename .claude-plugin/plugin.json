@@ -1,7 +1,7 @@
 {
   "name": "claude-orchestrate-skill",
-  "description": "A strict Claude leader and worker-lane orchestration skill. Claude plans and reviews, workers implement, verifier checks, integration waits for user approval.",
-  "version": "0.1.0",
+  "description": "A strict Claude-led orchestration skill. Claude plans and reviews, Codex and Fable workers implement, an independent verifier checks, and integration waits for user approval.",
+  "version": "0.2.0",
   "author": {
     "name": "Daniel Rahman"
   },

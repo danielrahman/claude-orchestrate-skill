@@ -1,193 +1,254 @@
 ---
 name: orchestrate
-description: Run a task through a strict Claude leader and worker-lane flow in a dedicated worktree. Use when the user asks to orchestrate work, delegate to workers, split implementation lanes, verify independently, or keep Claude out of direct edits.
+description: Run Claude as the leader of a worktree-based task with explicit Codex and Fable worker lanes, independent verification, and user-approved integration. Use when the user asks to orchestrate, delegate to workers, split implementation lanes, or keep the leader out of direct edits.
 ---
 
-# Orchestrate
+# Orchestrate (Claude leader)
 
-You are the leader. You research, plan, delegate, review, and approve. You do
-not edit files in the primary checkout or in worker worktrees. Every code,
-doc, copy, or config change goes to a worker lane, however small.
+You are the leader. You research, plan, delegate, review, and approve. Once this
+workflow starts, you do not edit files, open the browser, or run integration
+Git commands yourself. Every code, UI, test, doc, copy, config, verification,
+and integration action belongs to a named worker lane.
 
-Your outputs are plans, worker briefs, reviews, and reports. Browser and
-visual checks go to a verifier lane. Git commits and merges go to an
-integration lane. The leader does not self-grade the work and does not merge
-without explicit user approval.
+Use Fable workers for browser-visible UI implementation and refinement. Use
+Codex `gpt-5.6-sol` workers for research scouts, plan review, non-UI
+implementation, verification, and Git integration. Pin the model and reasoning
+effort explicitly on every dispatch:
 
-Use this workflow when the task is substantial enough to benefit from lane
-ownership, independent verification, or a clean worktree boundary. For tiny
-one-file fixes, the orchestration overhead may be larger than the work.
+- `xhigh` for research, plan review, and verification
+- `medium` for implementation, tests, docs/copy, and integration
+
+If a named model or worker surface is unavailable, choose the nearest explicit
+replacement, disclose it in the plan, and keep implementation and verification
+separate. Never let an omitted model become an accidental routing decision.
+
+Every Codex brief ends with: "Return a final report. Do not stop at progress
+updates."
 
 ## Flow
 
 ### 1. Research
 
-Read the repository instructions first: `AGENTS.md`, `CLAUDE.md`, project docs,
-and the current code relevant to the task. Resolve conflicts between docs and
+Read repository instructions first: `AGENTS.md`, `CLAUDE.md`, system-of-record
+docs, module docs, and the current code. Resolve conflicts between docs and
 runtime behavior before writing worker briefs.
 
-Research deeply enough to produce:
-
-- exact file or module ownership per lane
-- acceptance criteria per lane
-- known risks and edge cases
-- verification commands
-- user constraints such as read-only, no commit, no deploy, or no code
-
-Do not turn research into implementation.
-
-### 2. Plan
-
-Split the task into lanes. Parallel lanes must not touch the same files. Each
-lane needs a concrete outcome, owned files, acceptance criteria, and checks.
-
-Get user approval before dispatching larger plans. For small orchestration
-tasks, a compact plan summary is enough.
-
-### 3. Worktree
-
-One slice equals one branch plus one worktree. Prefer a sibling or configured
-worktree root, not the primary checkout.
+Read the load-bearing files yourself. For a broad codebase sweep, delegate
+read-only Codex scouts in parallel and save concise memos outside the worktree:
 
 ```bash
-git worktree add {worktree_root}/{slug} -b {slug} {base_branch}
-cd {worktree_root}/{slug}
+codex exec -C {repo_root} \
+  -m gpt-5.6-sol \
+  -c model_reasoning_effort=xhigh \
+  -s read-only \
+  --output-last-message {scratchpad}/research-{topic}.md \
+  "{self_contained_research_brief}" < /dev/null
 ```
 
-Then prepare the worktree for the repository:
+Scout memos are input, not truth. Verify every claim that the plan depends on.
+Do not turn research into implementation.
 
-- install dependencies only if missing
-- generate code clients if the project needs it
-- copy local environment files only when needed, never commit secrets
-- start one dev server for the slice if browser verification is required
+### 2. Plan and independent challenge
 
-Tell the user the worktree path, branch, local URL, and any `tmux attach`
-command. Verifiers reuse the running server instead of starting another one.
+Split the task into lanes. Every lane has:
 
-Never do slice work directly in the primary checkout.
+- one concrete outcome
+- exact file or module ownership
+- dependencies on other lanes
+- acceptance criteria
+- verification commands or browser scenarios
+- allowed side effects and user constraints
 
-### 4. Dispatch Workers
+Parallel lanes never share files. For a multi-lane slice, send the plan and
+draft briefs to a read-only Codex reviewer at `xhigh`. Ask it to find ownership
+collisions, missing or unverifiable criteria, stale assumptions, and ignored
+source-of-truth docs. The reviewer critiques; it does not rewrite. Adjudicate
+each finding yourself.
 
-Pick the worker by lane type. Every worker brief is self-contained and includes
-the worktree path, exact owned files, source docs to read first, acceptance
-criteria, verification commands, and report format.
+Before asking for plan approval, print the complete current plan in the same
+conversation turn: lanes, ownership, dependencies, acceptance criteria, and
+key decisions. A scratchpad path or log pointer is not a visible plan. After
+any plan edit, print the full updated plan again before asking.
 
-Worker rules:
+### 3. Create the slice worktree
 
-- no git commands
-- no commits
-- no edits outside owned files
-- no starting unrelated work
-- return a final report, not only progress updates
+One slice equals one branch plus one worktree. Use repository placeholders and
+the project's actual default branch:
 
-Recommended lane split:
+```bash
+git -C {repo_root} worktree add \
+  {worktree_root}/{slug} -b {branch_name} {base_branch}
+```
 
-| Lane | Worker | Owns |
+Prepare only what the repository requires: dependencies, generated clients,
+local environment files, migrations, or fixtures. Never commit secrets. If
+browser verification is required, start one dev server for the slice and tell
+the user the worktree path, branch, URL, and attach or log command. All workers
+and verifiers reuse that server.
+
+Never do slice work in the primary checkout.
+
+### 4. Dispatch workers
+
+Use non-overlapping lanes and run independent lanes concurrently.
+
+| Lane | Worker | Policy |
 | --- | --- | --- |
-| Backend | Codex or another implementation worker | services, API routes, data models, domain logic, tests |
-| UI build | Opus or strongest UI-capable worker | components, screens, styling, layout |
-| UI refinement | Composer or detail-focused worker | spacing, alignment, states, truncation, finish |
-| Verify | Codex verifier or independent reviewer | browser checks, functional checks, screenshots, command output |
-| Integrate | Codex integration lane or trusted git operator | exact staged files, focused commit, approved merge |
+| Read-only research and plan review | Codex | `gpt-5.6-sol`, `xhigh`, read-only |
+| Backend, services, data, domain logic, tests, docs/copy | Codex | `gpt-5.6-sol`, `medium`, workspace-write |
+| UI implementation and refinement | Fable | explicit Fable model, exact UI-owned files |
+| Verification | fresh Codex verifier | `gpt-5.6-sol`, `xhigh`, no edits |
+| Commit and merge | Codex integration worker | `gpt-5.6-sol`, `medium`, exact Git brief |
 
-If a worker is not available in the environment, replace it with the closest
-equivalent and say so in the plan. Do not silently collapse writing and
-verification into one lane.
+A Codex implementation command follows this shape:
 
-### 5. UI Refinement
+```bash
+codex exec -C {worktree} \
+  -m gpt-5.6-sol \
+  -c model_reasoning_effort=medium \
+  -s workspace-write \
+  --output-last-message {scratchpad}/{lane}-last.md \
+  "{self_contained_worker_brief}" < /dev/null \
+  > {scratchpad}/{lane}.log 2>&1
+```
 
-For browser-visible UI changes, run refinement before verification:
+Use the Claude Code worker tool for Fable UI lanes and set its model explicitly.
+If the exact tool names differ in the installed Claude Code version, follow the
+live tool schema rather than inventing arguments.
 
-1. Detail pass: spacing, alignment, hover and focus states, truncation, mobile
-   fit, and obvious polish.
-2. Mandatory skill pass, in this order:
-   - [`/adapt`](https://www.ui-skills.com/skills/pbakaus/adapt/) - responsive
-     layout structure, breakpoints, fluid fit, and touch targets
-   - [`/typecraft-guide-skill`](https://github.com/ehmo/typecraft-guide-skill/blob/main/skills/typecraft-guide/SKILL.md) -
-     typography after the responsive layout is settled
-   - [`/web-animation-design`](https://github.com/vercel-labs/open-agents/blob/main/.agents/skills/web-animation-design/SKILL.md) -
-     motion and animation on the settled layout
-   - [`/platform-web`](https://github.com/ehmo/platform-design-skills/blob/main/skills/web/SKILL.md) -
-     final web guidelines audit, including contrast, focus states,
-     reduced-motion behavior, and browser fit
+Keep a parent-side lane ledger with:
 
-`/platform-web` maps to the `web-design-guidelines` skill in
-[ehmo/platform-design-skills](https://github.com/ehmo/platform-design-skills).
+- lane name, worker/session id, owned files, and expected artifact
+- requested model and reasoning effort
+- active, queued, blocked, or complete status
+- final payload received, recovered, or missing
 
-The refinement workers stay inside the UI lane files and keep the product's
-existing design direction.
+Progress text is not a final payload. Recover a missing final report through
+the available session/thread tooling; if none exists, restart only the missing
+lane with a narrower self-contained brief.
 
-### 6. Verify
+Every worker brief includes the outcome and why, absolute repo and worktree
+paths, exact owned files, source docs, acceptance criteria, allowed side
+effects, checks, and final report shape. Tell non-integration workers that they
+are not alone, must not revert other changes, must not run Git, must not commit,
+and must not touch files outside their lane. The integration worker is the only
+exception: its brief lists the exact allowed Git commands and paths.
 
-Two gates, in order.
+When codebase reality forces a deviation, the worker chooses the conservative
+option and records it in `implementation-notes-{lane-slug}.md` at the worktree
+root under `## Deviations`. Ambiguous guesses go under `## Assumptions`. The
+notes are working artifacts and are never committed. If no notes file exists,
+the final report must explicitly claim zero deviations and zero assumptions.
 
-**Gate A: independent verification**
+### 4a. UI prototype phase
 
-The verifier did not write the implementation. It checks the affected routes or
-commands against the acceptance criteria and reports pass or fail with evidence:
+For a new screen, component, or visible redesign, run a Fable prototype worker
+before the primary UI lane. Skip only when the task is mechanical and the
+target look is already settled; record the skip in the plan.
 
-- screenshots for visual work
-- command output for checks
-- exact route, URL, viewport, or test command used
-- any failed criterion with reproduction details
+Build three structurally different variants on a throwaway prototype route,
+switchable with `?variant=a|b|c`. Use fake or read-only data and no mutations.
+Variants differ in layout and information hierarchy, not only color or copy,
+and each has a one-line design-intent label.
 
-The verifier never edits code.
+Have the independent verifier capture every variant. Pick the winner against
+the repository's design principles and the slice goal, record the reason, and
+point the primary UI brief to the winning source. Production UI is rewritten
+properly; prototype code is never staged or merged.
+
+### 4b. UI refinement and skill pass
+
+After primary UI implementation, use a fresh Fable worker to refine spacing,
+alignment, responsive behavior, focus and hover states, truncation, and small
+inconsistencies without changing the approved structure.
+
+When the skills are installed, apply them in this order:
+
+1. `/adapt` for responsive layout and touch targets
+2. `/typecraft-guide` for typography on the stable layout
+3. `/web-animation-design` for motion on the settled interface
+4. `/web-design-guidelines` for the final accessibility and browser-fit audit
+
+The refinement worker stays inside the UI lane and goes through the same
+verification gates as the primary implementation.
+
+### 5. Verify
+
+Use two independent gates in order. The worker that wrote a lane never verifies
+it.
+
+**Gate A: Codex verifier**
+
+Dispatch a fresh Codex verifier at `gpt-5.6-sol` and `xhigh`. It never edits
+files. It checks every acceptance criterion against the existing slice server,
+runs repository checks scaled to risk, saves screenshots to files, and reports
+pass or fail per criterion with exact evidence.
+
+For browser-visible work, prefer the current Codex app Browser skill through
+the bundled browser client and the `iab` backend. Smoke-test a real browser
+call; tool discovery alone is not proof. If the in-app backend is missing,
+disconnected, times out, or reports that no IAB backend was discovered, retry
+once. Ask the user to reopen or activate the in-app browser when needed, then
+fall back to Playwright and HTTP checks against the same server. State exactly
+what the fallback did and did not verify.
+
+Use the least privilege that can access the local server and browser. If the
+browser runtime requires wider sandbox access, limit it to the verifier, forbid
+edits in the brief, and review the diff afterward. Never give an implementation
+worker wider access for convenience.
 
 **Gate B: leader review**
 
-Review the full diff yourself:
+Read every implementation-notes file first. Accept each deviation or assumption
+explicitly or send it back as a fix brief. An unlogged departure from the brief
+fails Gate B. Then review the complete branch diff for correctness,
+architecture, authorization and data exposure, tests, copy rules, lane
+boundaries, and unrelated changes.
 
-- correctness
-- architecture and ownership boundaries
-- authorization and data exposure
-- tests and fixture impact
-- copy and localization rules
-- no unrelated refactors
-- no worker lane overlap
+Worker claims are not evidence. Command output, screenshots, persisted behavior,
+and the diff are evidence.
 
-Worker claims are not evidence. Command output, screenshots, and the diff are
-evidence.
+On failure, return findings to the owning lane and repeat the affected gates.
+Even one-line fixes remain worker-owned. After two failed round trips on the
+same issue, stop and escalate with the evidence.
 
-### 7. Fix Loop
-
-If either gate fails, send findings back to the owning worker as a new
-self-contained brief. Even one-line fixes go back through the lane boundary.
-
-After two failed round trips on the same lane, stop and escalate with the exact
-findings instead of looping indefinitely.
-
-### 8. Integrate
+### 6. Integrate
 
 Only after both gates pass:
 
-1. Ask an integration lane to stage the exact files and make a focused commit.
-2. Review the reported `git status` and `git log`.
-3. Present the summary and verification evidence to the user.
-4. Wait for explicit approval before merging into the primary branch.
-5. Merge without rebasing or force pushing unless the user explicitly requests it.
-6. Run a scaled sanity check in the primary checkout.
-7. Remove the worktree and cleanup only after the merge is verified.
+1. For user-visible behavior, ask whether the repository needs a changelog,
+   release note, or product announcement. If yes, route it through a docs/copy
+   worker and verify it before staging.
+2. Send a Codex integration worker an exact list of files to stage, the intended
+   commit message, and commands to report `git status` and `git log`. Never use
+   blanket staging in a mixed worktree.
+3. Exclude implementation notes, prototype routes, screenshots, logs, and other
+   working artifacts.
+4. Present the lane summary, diff scope, commit, and verification evidence to
+   the user. For UI work, include prototype variants and the winning rationale.
+5. Wait for explicit approval before merging into the primary branch.
+6. Prefer a fast-forward merge. Never rebase, force-push, push, or deploy unless
+   the user explicitly authorizes it.
+7. Sanity-check the primary checkout, then clean up the worktree, branch, and
+   dev-server session only after integration is verified.
 
-## Hard Rules
+### 7. Report
 
-- The leader never edits files.
-- One worker, one lane; no two workers own the same files at once.
-- The worker that wrote the change never verifies it.
-- Code workers do not run git.
-- Integration happens only after verification passes.
-- Merge only after explicit user approval.
+Report what shipped, lane results, verification evidence, commit and branch
+details, and open items. Every done claim points to a result from this run.
+
+## Hard rules
+
+- The leader never implements, browses, commits, or merges in orchestrated mode.
+- One worker owns one lane; parallel workers never share files.
+- The worker that wrote a change never verifies it.
+- Implementation workers never run Git; only the dedicated integration lane may
+  run the exact Git commands in its brief.
+- Models and reasoning effort are explicit on every dispatch.
+- Multi-lane plans receive independent challenge before user approval.
+- The full current plan appears immediately before every approval question.
+- Deviations and assumptions are recorded and reviewed before integration.
+- Prototype code and temporary evidence are never committed.
 - Proof over claims: no green report without command output or screenshots.
-- Respect user constraints in every worker brief.
-- Do not publish, deploy, push, or merge unless explicitly requested.
-
-## Report Format
-
-End with:
-
-- what shipped
-- lane summary
-- verification evidence
-- commit or branch details, if any
-- open issues or blocked items
-
-Every "done" claim must point to a real result from this run.
+- Merge, push, deploy, rebase, and force-push require explicit user authority.
+- Preserve every user constraint in worker and verifier briefs.

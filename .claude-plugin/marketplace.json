@@ -1,6 +1,6 @@
 {
   "name": "claude-orchestrate-skill",
-  "description": "Claude leads, workers build, a separate verifier checks. A strict worktree-based orchestration skill for delegated implementation.",
+  "description": "Claude leads, Codex and Fable workers build, and a separate verifier checks. A strict worktree-based orchestration skill.",
   "owner": {
     "name": "Daniel Rahman"
   },
@@ -8,7 +8,7 @@
     {
       "name": "claude-orchestrate-skill",
       "source": "./",
-      "description": "Claude leads, workers build, a separate verifier checks. A strict worktree-based orchestration skill for delegated implementation."
+      "description": "Claude leads, Codex and Fable workers build, and a separate verifier checks. A strict worktree-based orchestration skill."
     }
   ]
 }
